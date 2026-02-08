@@ -3,7 +3,7 @@ import { writeFileSync, mkdtempSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-import type { CompilerInfo } from './compilerTypes.js';
+import type { CompilerInfo } from './compileTypes.js';
 
 export function sanityCheckC(compiler: CompilerInfo): void {
   const dir = mkdtempSync(join(tmpdir(), 'relaxnative-'));

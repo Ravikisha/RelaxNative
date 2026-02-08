@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { detectCompilers } from './index.js';
+import { detectCompilers } from './detect.js';
 
 describe('compiler detection', () => {
   it('detects C compiler', () => {
