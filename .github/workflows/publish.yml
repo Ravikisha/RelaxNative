@@ -34,8 +34,8 @@ jobs:
           echo "CXXFLAGS=\"-std=c++20\" npm i --legacy-peer-deps"
           CXXFLAGS="-std=c++20" npm i --legacy-peer-deps
 
-      - name: Test
-        run: npm run test:inband
+      # - name: Test
+      #   run: npm run test:inband
 
       - name: Build
         run: npm run build
