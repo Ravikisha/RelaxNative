@@ -1,7 +1,7 @@
 <!-- markdownlint-disable MD033 -->
 
 <p align="center">
-  <img src="./docs/logo.png" width="280" alt="Relaxnative logo" />
+  <img src="./docs/logo.jpg" width="400" alt="Relaxnative logo" />
 </p>
 
 <h1 align="center">Relaxnative</h1>

@@ -34,7 +34,7 @@
     "native/**",
     "LICENSE",
     "README.md",
-    "docs/logo.png"
+    "docs/logo.jpg"
   ],
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts src/worker/workerEntry.ts src/worker/processEntry.ts src/esmLoader.ts src/memory/memory.selftest.ts --format esm --dts",
