@@ -19,7 +19,9 @@ jobs:
           cache: npm
 
       - name: Install deps
-        run: npm ci
+        run: |
+          echo "CXXFLAGS=\"-std=c++20\" npm i --legacy-peer-deps"
+          CXXFLAGS="-std=c++20" npm i --legacy-peer-deps
 
       - name: Test (single worker for native determinism)
         run: npm run test:inband
