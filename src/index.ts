@@ -1,4 +1,10 @@
 export * from './loader';
+export * as native from './memory/index.js';
+export * from './memory/index.js';
+export * from './registry/index.js';
+export * from './nativeTestHarness.js';
+export * from './benchmark.js';
+export * from './dev/hotReload.js';
 export { detectCompilers } from './compiler/detect.js';
 export { compileNative } from './compiler/compileNative.js';
 export { compileWithCache } from './compiler/index.js';

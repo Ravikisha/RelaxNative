@@ -5,7 +5,7 @@ import { parseNativeSource } from './index.js';
 describe('native parser', () => {
   it('extracts C functions', () => {
     const result = parseNativeSource('examples/add.c', 'c');
-    expect(result.functions.length).toBeGreaterThan(0);
-    expect(result.functions[0].name).toBe('add');
+  expect(Object.keys(result.functions).length).toBeGreaterThan(0);
+  expect(result.functions.add.name).toBe('add');
   });
 });

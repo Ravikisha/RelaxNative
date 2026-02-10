@@ -1,0 +1,15 @@
+# We publish via package.json "files" whitelist, but keeping this helps avoid accidents.
+
+src/
+examples/
+dist/**/*.map
+*.tsbuildinfo
+.vscode/
+.github/
+
+# local caches
+.cache/
+node_modules/
+
+# OS
+.DS_Store

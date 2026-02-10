@@ -1,0 +1,16 @@
+{
+  "name": "fast-matrix",
+  "version": "0.1.0",
+  "exports": [
+    { "source": "matrix.c", "name": "matrix" }
+  ],
+  "flags": [],
+  "permissions": {
+    "fs": { "read": [], "write": [] },
+    "network": { "outbound": false },
+    "process": { "spawn": false }
+  },
+  "functionMode": {
+    "mul2": "sync"
+  }
+}

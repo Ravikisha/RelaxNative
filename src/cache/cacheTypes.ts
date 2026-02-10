@@ -7,4 +7,9 @@ export type CacheEntry = {
   flags: string[];
   platform: string;
   createdAt: number;
+  /**
+   * Monotonic-ish timestamp (ms since epoch) updated whenever this cache entry is used.
+   * This is tracked in metadata to avoid relying on filesystem atime.
+   */
+  lastAccessAt?: number;
 };

@@ -1,0 +1,14 @@
+{
+  "name": "unsafe-perms",
+  "version": "0.1.0",
+  "trust": "community",
+  "exports": [{ "source": "noop.c" }],
+  "permissions": {
+    "fs": { "read": [], "write": [] },
+    "network": { "outbound": false },
+    "process": { "spawn": false }
+  },
+  "limits": {
+    "timeoutMs": 2000
+  }
+}
