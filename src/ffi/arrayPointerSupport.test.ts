@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import { loadNative } from '../loader.js';
+import { native } from '../index.js';
 import { writeFileSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -34,7 +35,7 @@ int twoSum(const int* nums, int numsSize, int target) {
     expect(out).toBe(1);
   }, 60_000);
 
-  it('throws a clear error for pointer-to-pointer args (int**)', async () => {
+  it('supports passing NativeBuffer[] for int** (marshalled as a temporary pointer table)', async () => {
     const src = `
 // @sync
 int takes_pp(int** p) { (void)p; return 123; }
@@ -44,6 +45,17 @@ int takes_pp(int** p) { (void)p; return 123; }
   const file = join(dir, 'pp.c');
   writeFileSync(file, src, 'utf8');
 
-  await expect(loadNative(file, { isolation: 'process' })).rejects.toThrow(/pointer-to-pointer/i);
+  const mod: any = await loadNative(file, { isolation: 'in-process' });
+
+  // Each row must have a stable native address.
+  const row1 = native.alloc(3 * 4);
+  row1.i32().set([1, 2, 3]);
+  const row2 = native.alloc(3 * 4);
+  row2.i32().set([4, 5, 6]);
+
+  const out = await mod.takes_pp([row1, row2]);
+  row1.free();
+  row2.free();
+  expect(out).toBe(123);
   }, 60_000);
 });
