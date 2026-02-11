@@ -336,7 +336,10 @@ function mapArgsForNative(
       const nb = alloc(b.byteLength);
       nb.write(new Uint8Array(b.buffer, b.byteOffset, b.byteLength));
       keepAlive.push(na, nb);
-      return { args: [na.address, nb.address, n], keepAlive };
+  // dot_f64 is declared as (double*, double*, int).
+  // With typed pointers enabled (pointer<double>), koffi expects a pointer
+  // value, not a numeric address. Pass NativeBuffer so koffi can marshal.
+  return { args: [na, nb, n], keepAlive };
     }
   }
 

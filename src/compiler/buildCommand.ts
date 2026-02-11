@@ -16,21 +16,43 @@ export function buildCompileCommand(
   const outputName = getSharedLibName(baseName, platform);
   const outputPath = `${request.outDir}/${outputName}`;
 
-  const flags = request.flags ?? [];
+  const userFlags = request.flags ?? [];
+  const sources = [request.sourcePath, ...(request.sources ?? [])];
+  const includePaths = request.includePaths ?? [];
+  const libraryPaths = request.libraryPaths ?? [];
+  const libraries = request.libraries ?? [];
+
+  // Translate higher-level options to compiler flags.
+  // Note: We intentionally keep this conservative/portable. Users can always
+  // drop to `flags` for advanced scenarios.
+  const includeFlags =
+    compiler.vendor === 'msvc'
+      ? includePaths.map((p) => `/I${p}`)
+      : includePaths.flatMap((p) => ['-I', p]);
+  const libPathFlags =
+    compiler.vendor === 'msvc'
+      ? libraryPaths.map((p) => `/LIBPATH:${p}`)
+      : libraryPaths.flatMap((p) => ['-L', p]);
+  const libFlags =
+    compiler.vendor === 'msvc'
+      ? libraries.map((l) => `${l}.lib`)
+      : libraries.flatMap((l) => ['-l', l]);
+
+  const flags = [...includeFlags, ...libPathFlags, ...libFlags, ...userFlags];
 
   let command: string[] = [];
 
   if (language === 'c' || language === 'cpp') {
     if (compiler.vendor === 'msvc') {
       command = [
-        request.sourcePath,
+  ...sources,
         '/LD',
         `/Fe:${outputPath}`,
         ...flags,
       ];
     } else {
       command = [
-        request.sourcePath,
+  ...sources,
         '-shared',
         '-fPIC',
         '-o',

@@ -43,7 +43,7 @@ type IsolatedPingRequest = {
 type IsolatedRequest = IsolatedCallRequest | IsolatedPingRequest;
 
 type IsolatedResponse =
-  | { id: number; ok: true; result: any }
+  | { id: number; ok: true; result: any; args?: any[] }
   | {
       id: number;
       ok: false;
@@ -119,8 +119,8 @@ function startChild(): ChildProcess {
   if (p.cp !== cp) return;
     pending.delete(msg.id);
 
-    const res = msg as IsolatedResponse;
-    if (res.ok) p.resolve(res.result);
+  const res = msg as IsolatedResponse;
+  if (res.ok) p.resolve(res);
     else {
   const details: string[] = [res.error.message];
   if (res.error.callsite) details.push('\n--- remote callsite ---\n' + res.error.callsite);
@@ -185,6 +185,8 @@ export async function callIsolated(
   safety?: { trust?: 'local' | 'community' | 'verified'; permissions?: any; limits?: any },
   callsite?: string,
 ) {
+  // Keep references to original args so we can update in-place outputs after IPC.
+  const originalArgs = Array.isArray(args) ? args : [];
   const cp = startChild();
 
   // If this is a fresh process, ensure it responds before sending heavy work.
@@ -206,7 +208,25 @@ export async function callIsolated(
     bindings,
   safety,
     fn,
-  args,
+    // Structured-clone can't send TypedArrays as "real" typed arrays through fork IPC
+    // in a way that koffi consistently recognizes in the helper.
+    // We serialize them explicitly and reconstruct in processEntry.
+    args: Array.isArray(args)
+      ? args.map((a) => {
+          if (a && ArrayBuffer.isView(a)) {
+            const view = a as ArrayBufferView;
+            return {
+              __relaxnative_typedarray: true,
+              type: (a as any).constructor?.name ?? 'TypedArray',
+              // clone exact bytes used by the view
+              bytes: Buffer.from(
+                view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength),
+              ),
+            };
+          }
+          return a;
+        })
+      : args,
   // forward the captured JS callsite for richer crash diagnostics
   ...(callsite ? { callsite } : {}),
   };
@@ -250,12 +270,39 @@ export async function callIsolated(
     }
 
   pending.set(id, { resolve: wrappedResolve, reject: wrappedReject, cp });
-    cp.send(req);
+  cp.send(req);
   });
+
+  const withResult = async () => {
+  const res = (await baseCall) as any;
+
+    // Copy back any TypedArray outputs.
+    // Heuristic: if the user passed a TypedArray, treat it as an in/out buffer.
+    // (For const input-only buffers the copy is redundant but safe.)
+  const returnedBoxedArgs = Array.isArray(res?.args) ? res.args : null;
+    if (returnedBoxedArgs) {
+      for (let i = 0; i < returnedBoxedArgs.length; i++) {
+        const orig = originalArgs[i];
+        const boxed = returnedBoxedArgs[i];
+        if (orig && ArrayBuffer.isView(orig) && boxed?.__relaxnative_typedarray === true) {
+          const bytesObj = boxed.bytes;
+          const buf: Buffer = Buffer.isBuffer(bytesObj)
+            ? bytesObj
+            : bytesObj?.type === 'Buffer' && Array.isArray(bytesObj?.data)
+              ? Buffer.from(bytesObj.data)
+              : Buffer.from([]);
+          const u8 = new Uint8Array(orig.buffer, (orig as any).byteOffset ?? 0, (orig as any).byteLength ?? 0);
+          u8.set(new Uint8Array(buf.buffer, buf.byteOffset, Math.min(buf.byteLength, u8.byteLength)));
+        }
+      }
+    }
+
+  return res?.result;
+  };
 
   if (typeof timeoutMs === 'number' && timeoutMs > 0) {
     return Promise.race([
-      baseCall,
+      withResult(),
       new Promise((_, reject) => {
         setTimeout(() => {
           reject(
@@ -270,7 +317,7 @@ export async function callIsolated(
     ]);
   }
 
-  return baseCall;
+  return withResult();
 }
 
 export function stopIsolatedRuntime() {

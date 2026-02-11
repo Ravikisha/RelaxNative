@@ -24,9 +24,22 @@ export type RelaxConfig = {
 
 export type IsolationMode = 'in-process' | 'worker' | 'process';
 
+export type NativeBuildOptions = {
+  /** Additional source files to compile+link into the same shared library (C/C++ only). */
+  sources?: string[];
+  /** Header search paths (-I). */
+  includePaths?: string[];
+  /** Library search paths (-L / /LIBPATH). */
+  libraryPaths?: string[];
+  /** Link libraries (-lfoo / foo.lib). */
+  libraries?: string[];
+  /** Additional raw compiler/linker flags. */
+  flags?: string[];
+};
+
 async function buildNative(
   sourcePath: string,
-  options?: { config?: RelaxConfig },
+  options?: { config?: RelaxConfig; build?: NativeBuildOptions },
 ): Promise<{ libPath: string; bindings: any; api: Record<string, Function> }> {
   traceInfo('loadNative.build.begin', { sourcePath });
   const { c, rust, platform } = detectCompilers();
@@ -41,6 +54,7 @@ async function buildNative(
   const compileResult = compileWithCache(compiler, platform, {
     sourcePath,
     outDir: '.cache/native',
+    ...(options?.build ?? {}),
   });
 
   traceDebug('loadNative.build.compiled', {
@@ -98,7 +112,7 @@ async function buildNative(
 
 export async function loadNative(
   sourcePath: string,
-  options?: { config?: RelaxConfig; isolation?: IsolationMode },
+  options?: { config?: RelaxConfig; isolation?: IsolationMode; build?: NativeBuildOptions },
 ) {
   traceInfo('loadNative.begin', { sourcePath, isolation: options?.isolation ?? 'worker' });
   // Dev-mode hot reload integration:
@@ -128,6 +142,7 @@ export async function loadNativeWithBindings(
   options?: {
     config?: RelaxConfig;
     isolation?: IsolationMode;
+  build?: NativeBuildOptions;
     mutateBindings?: (bindings: any) => void;
   },
 ): Promise<{ mod: any; bindings: any }> {
