@@ -1,6 +1,6 @@
 {
   "name": "relaxnative",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "type": "module",
   "description": "Zero-config native C/C++/Rust execution for Node.js",
   "license": "MIT",
