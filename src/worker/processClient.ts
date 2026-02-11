@@ -2,6 +2,7 @@ import { fork, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { traceDebug, traceError, traceInfo } from '../dx/trace.js';
 
 export type ProcessIsolationErrorCode =
   | 'ISOLATED_PROCESS_CRASH'
@@ -88,8 +89,19 @@ function startChild(): ChildProcess {
 
   const { distEntry } = helperEntryPath();
 
+  if (!existsSync(distEntry)) {
+    traceError('isolation.process.helper.missing', { distEntry });
+    throw new ProcessIsolationError(
+      'ISOLATED_PROCESS_START_FAILED',
+      `Process isolation helper was not found at: ${distEntry}. This usually means the package was published without dist/worker/processEntry.js`,
+      { distEntry },
+    );
+  }
+
   // fork() needs a JS file. In dev/vitest, dist likely exists because tests build.
   const entry = distEntry;
+
+  traceInfo('isolation.process.helper.start', { entry });
 
   const cp = fork(entry, {
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
@@ -136,6 +148,7 @@ function startChild(): ChildProcess {
       `Isolated runtime exited (code=${code}, signal=${signal ?? 'none'})`,
       { code, signal },
     );
+  traceError('isolation.process.helper.exit', { code, signal });
     rejectAll(reason);
   });
 
@@ -145,6 +158,7 @@ function startChild(): ChildProcess {
       `Failed to start isolated runtime: ${String(err)}`,
       { err },
     );
+  traceError('isolation.process.helper.error', { message: String(err) });
     child = null;
     rejectAll(reason);
   });
@@ -156,6 +170,7 @@ function startChild(): ChildProcess {
 async function ping(cp: ChildProcess) {
   const id = ++seq;
   const req: IsolatedPingRequest = { id, type: 'ping' };
+  traceDebug('isolation.process.ping', { id });
   return new Promise<void>((resolve, reject) => {
   pending.set(id, { resolve, reject, cp });
     cp.send(req);
@@ -177,6 +192,13 @@ export async function callIsolated(
   await ping(cp);
 
   const id = ++seq;
+  traceDebug('isolation.process.call', {
+    id,
+    fn,
+    argc: args?.length ?? 0,
+    hasSafety: !!safety,
+    hasCallsite: !!callsite,
+  });
   const req: IsolatedCallRequest = {
     id,
     type: 'call',

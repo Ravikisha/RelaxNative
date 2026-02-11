@@ -1,6 +1,8 @@
 import { callAsync } from './workerClient.js';
 import { captureCallsite } from '../utils/callsite.js';
 import { callIsolated } from './processClient.js';
+import { traceDebug } from '../dx/trace.js';
+import { formatBindingSignature } from '../dx/trace.js';
 
 export function wrapFunctions(
   api: Record<string, Function>,
@@ -27,7 +29,14 @@ export function wrapFunctions(
       binding?.thread === 'worker' ||
       binding?.cost === 'high';
 
-  wrapped[name] = (...args: any[]) => {
+    wrapped[name] = (...args: any[]) => {
+      traceDebug('dispatch', {
+        isolation,
+        fn: name,
+        argc: args?.length ?? 0,
+        mode: binding?.mode,
+        cost: binding?.cost,
+      });
       // base dispatch by requested isolation
       if (isolation === 'process') {
   // In process isolation we must go through IPC to be crash-safe.
@@ -47,7 +56,14 @@ export function wrapFunctions(
 
       // in-process: fastest, unsafe
       if (typeof fn !== 'function') {
-        throw new Error(`Function not found: ${name}`);
+        const available = Object.keys(api ?? {});
+        const sig = binding ? formatBindingSignature(binding) : undefined;
+        const detail = [
+          `Function not found: ${name}`,
+          sig ? `Signature (from parser): ${sig}` : undefined,
+          available.length ? `Available exports: ${available.join(', ')}` : undefined,
+        ].filter(Boolean);
+        throw new Error(detail.join('\n'));
       }
       return fn(...args);
     };

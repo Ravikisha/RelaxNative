@@ -5,6 +5,7 @@ import { parseNativeSource } from './parser/index.js';
 import { loadFfi } from './ffi/index.js';
 import { wrapFunctions } from './worker/wrapFunctions.js';
 import { loadNativeDevHot } from './dev/hotReload.js';
+import { traceDebug, traceInfo, formatBindingSignature } from './dx/trace.js';
 
 export type ExecutionMode = 'sync' | 'async';
 
@@ -27,11 +28,13 @@ async function buildNative(
   sourcePath: string,
   options?: { config?: RelaxConfig },
 ): Promise<{ libPath: string; bindings: any; api: Record<string, Function> }> {
+  traceInfo('loadNative.build.begin', { sourcePath });
   const { c, rust, platform } = detectCompilers();
   const language = detectLanguage(sourcePath);
   const compiler = language === 'rust' ? rust : c;
 
   if (!compiler) {
+  traceDebug('loadNative.build.noCompiler', { sourcePath, language });
     throw new Error(`No compiler for ${language}`);
   }
 
@@ -40,7 +43,26 @@ async function buildNative(
     outDir: '.cache/native',
   });
 
+  traceDebug('loadNative.build.compiled', {
+    sourcePath,
+    language,
+    outputPath: compileResult.outputPath,
+  });
+
   const bindings = parseNativeSource(sourcePath, language);
+
+  // Optional: print discovered signatures when tracing.
+  const funcs = Object.values(bindings?.functions ?? {});
+  traceDebug('loadNative.bindings', {
+    sourcePath,
+    functionCount: funcs.length,
+    functions: funcs.map((b: any) => ({
+      name: b?.name,
+      mode: b?.mode,
+      cost: b?.cost,
+      signature: formatBindingSignature(b),
+    })),
+  });
 
   // apply user overrides deterministically (before any execution)
   const config = options?.config;
@@ -66,6 +88,11 @@ async function buildNative(
   (globalThis as any).__bindings = bindings;
 
   const api = loadFfi(compileResult.outputPath, bindings);
+  traceInfo('loadNative.build.done', {
+    sourcePath,
+    libPath: compileResult.outputPath,
+    exports: Object.keys(api ?? {}),
+  });
   return { libPath: compileResult.outputPath, bindings, api };
 }
 
@@ -73,6 +100,7 @@ export async function loadNative(
   sourcePath: string,
   options?: { config?: RelaxConfig; isolation?: IsolationMode },
 ) {
+  traceInfo('loadNative.begin', { sourcePath, isolation: options?.isolation ?? 'worker' });
   // Dev-mode hot reload integration:
   // When explicitly enabled, return a stable proxy module that reloads on change.
   // Config overrides aren't currently supported through hot reload (kept explicit).
@@ -86,7 +114,9 @@ export async function loadNative(
 
   const { libPath, bindings, api } = await buildNative(sourcePath, options);
   const isolation = options?.isolation ?? 'worker';
-  return wrapFunctions(api, libPath, bindings, { isolation });
+  const mod = wrapFunctions(api, libPath, bindings, { isolation });
+  traceInfo('loadNative.done', { sourcePath, isolation, functions: Object.keys(bindings?.functions ?? {}) });
+  return mod;
 }
 
 /**

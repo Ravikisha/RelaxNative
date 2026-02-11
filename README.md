@@ -55,6 +55,65 @@ Requirements:
 
 ## Quickstart
 
+### 0) Full end-to-end example (new folder → run)
+
+This is the fastest way to try Relaxnative in a clean folder.
+
+```bash
+mkdir -p my-relaxnative-app/native
+cd my-relaxnative-app
+npm init -y
+npm i relaxnative
+```
+
+Optional `package.json` (ESM + a run script):
+
+```json
+{
+  "name": "my-relaxnative-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "relaxnative": "^0.1.0"
+  }
+}
+```
+
+Create `native/add.c`:
+
+```c
+// @sync
+int add(int a, int b) {
+  return a + b;
+}
+```
+
+Create `index.js`:
+
+```js
+import { loadNative } from 'relaxnative';
+
+const mod = await loadNative('native/add.c', { isolation: 'worker' });
+console.log('add(1,2)=', mod.add(1, 2));
+```
+
+Run it:
+
+```bash
+npm start
+```
+
+If something goes wrong, re-run with tracing:
+
+```bash
+RELAXNATIVE_TRACE=1 npm start
+```
+
+---
+
 ### 1) Create a native file
 
 `native/add.c`
@@ -74,6 +133,30 @@ import { loadNative } from 'relaxnative';
 const mod = await loadNative('native/add.c', { isolation: 'worker' });
 console.log(mod.add(1, 2));
 ```
+
+---
+
+## Tracing (RELAXNATIVE_TRACE)
+
+When native code crashes or a worker/process boundary hides the real error, enable tracing.
+
+```bash
+RELAXNATIVE_TRACE=1 node index.js
+```
+
+More control:
+
+- `RELAXNATIVE_TRACE=1` enables trace events.
+- `RELAXNATIVE_TRACE_LEVEL=info|debug` controls verbosity (default: `info`).
+
+What you’ll see (examples):
+
+- Load lifecycle: `loadNative.begin`, `loadNative.build.begin`, `loadNative.build.done`, `loadNative.done`
+- Parsed signatures (debug): `loadNative.bindings`
+- Dispatch decisions: `dispatch`, `isolation.worker.dispatch`, `isolation.process.call`
+- Process helper lifecycle: `isolation.process.helper.start|exit|error`
+
+Tip: `RELAXNATIVE_TRACE_LEVEL=debug` will print parsed function signatures.
 
 ---
 
@@ -119,15 +202,55 @@ console.log(buf.address); // numeric pointer
 - fastest
 - unsafe: native crashes take down your Node process
 
+Example:
+
+```js
+import { loadNative } from 'relaxnative';
+
+const mod = await loadNative('native/add.c', { isolation: 'in-process' });
+console.log(mod.add(1, 2));
+```
+
 ### `worker`
 - worker-thread dispatch for async calls
 - sync calls may execute directly for low overhead
+
+Example (async heavy work):
+
+```c
+// native/heavy.c
+// @async
+int heavy(int n) {
+  long x = 0;
+  for (int i = 0; i < n * 10000000; i++) x += i;
+  return (int)x;
+}
+```
+
+```js
+import { loadNative } from 'relaxnative';
+
+const mod = await loadNative('native/heavy.c', { isolation: 'worker' });
+const result = await mod.heavy(5);
+console.log(result);
+```
 
 ### `process`
 - forked helper process
 - crash containment
 - best-effort Node runtime guards (module import denial for fs/network/spawn)
 - call timeout enforcement (kills helper)
+
+Example:
+
+```js
+import { loadNative } from 'relaxnative';
+
+// Process isolation always returns async wrappers.
+const mod = await loadNative('native/heavy.c', { isolation: 'process' });
+const result = await mod.heavy(5);
+console.log(result);
+```
 
 ---
 
@@ -139,6 +262,13 @@ Supported:
 - `@sync`
 - `@async`
 - `@cost low|medium|high`
+
+### Annotation + isolation quick rules
+
+- `@sync` + `in-process`: fastest, but a crash kills your app.
+- `@sync` + `worker`: may execute directly (fast) unless the binding is marked async/high-cost.
+- `@async` + `worker`: always goes through the worker thread and returns a Promise.
+- `process` isolation: **always async**, regardless of annotations (IPC boundary).
 
 ### What annotations mean
 
