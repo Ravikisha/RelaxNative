@@ -7,9 +7,11 @@ import {
 
 describe('benchmark traditional vs relaxnative', () => {
 	it('benchmarks JS baseline + relaxnative for known demo function (add)', async () => {
+		const baseline = (a: number, b: number) => a + b;
 		const res = await benchmarkCompareTraditionalVsRelaxnative('examples/add.c', 'add', {
 			iterations: 200,
 			warmup: 20,
+			baseline,
 			args: [1, 2],
 		});
 
@@ -31,6 +33,6 @@ describe('benchmark traditional vs relaxnative', () => {
 				warmup: 1,
 				args: [],
 			}),
-		).rejects.toThrow(/No default baseline/i);
+		).rejects.toThrow(/Missing JS baseline/i);
 	});
 });

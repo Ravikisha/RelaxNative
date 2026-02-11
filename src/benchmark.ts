@@ -121,176 +121,6 @@ type BaselineSpec = {
 };
 
 function getBuiltInBaseline(fnName: string): BaselineSpec | null {
-  if (fnName === 'add') {
-    return {
-      name: 'traditional-js',
-      fn: (a: number, b: number) => a + b,
-      defaultArgs: [1, 2],
-    };
-  }
-
-  // CPU-bound loop example (examples/loop.c)
-  if (fnName === 'loop_sum') {
-    return {
-      name: 'traditional-js',
-      fn: (n: number) => {
-        let acc = 0;
-        for (let i = 0; i < n; i++) {
-          acc += (i ^ 0x9e3779b9) & 0xffff;
-        }
-        return acc;
-      },
-      // default to a CPU-heavy iteration count so native has a chance to win
-      defaultArgs: [50_000_000],
-    };
-  }
-
-  // Big-buffer sum example (examples/buffer.c)
-  if (fnName === 'sum_u8') {
-    return {
-      name: 'traditional-js',
-      fn: (buf: Uint8Array, n: number) => {
-        let s = 0;
-        for (let i = 0; i < n; i++) s += buf[i];
-        return s;
-      },
-  // Default to 16MB to keep CI stable and still demonstrate buffer-heavy work.
-  defaultArgs: [new Uint8Array(16 * 1024 * 1024).fill(1), 16 * 1024 * 1024],
-    };
-  }
-
-  // Dot product example (examples/dot.c)
-  if (fnName === 'dot_f64') {
-  const n = 3_000_000; // ~24MB total across two arrays
-    const a = new Float64Array(n);
-    const b = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      a[i] = (i % 1024) * 0.001;
-      b[i] = (i % 2048) * 0.002;
-    }
-    return {
-      name: 'traditional-js',
-      fn: (aa: Float64Array, bb: Float64Array, nn: number) => {
-        let acc = 0;
-        for (let i = 0; i < nn; i++) acc += aa[i] * bb[i];
-        return acc;
-      },
-      defaultArgs: [a, b, n],
-    };
-  }
-
-  // SAXPY example (examples/saxpy.c)
-  if (fnName === 'saxpy_f64') {
-  const n = 3_000_000; // ~24MB per array
-    const x = new Float64Array(n);
-    const y = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      x[i] = (i % 1024) * 0.001;
-      y[i] = (i % 2048) * 0.002;
-    }
-    const a = 1.0001;
-    return {
-      name: 'traditional-js',
-      fn: (aa: number, xx: Float64Array, yy: Float64Array, nn: number) => {
-        for (let i = 0; i < nn; i++) yy[i] = aa * xx[i] + yy[i];
-        return yy[0];
-      },
-      defaultArgs: [a, x, y, n],
-    };
-  }
-
-  // Naive matmul example (examples/matmul.c)
-  if (fnName === 'matmul_f32') {
-    const M = 256;
-    const K = 256;
-    const N = 256;
-    const A = new Float32Array(M * K);
-    const B = new Float32Array(K * N);
-    const C = new Float32Array(M * N);
-    for (let i = 0; i < A.length; i++) A[i] = (i % 13) * 0.01;
-    for (let i = 0; i < B.length; i++) B[i] = (i % 7) * 0.02;
-    return {
-      name: 'traditional-js',
-      fn: (a: Float32Array, b: Float32Array, c: Float32Array, m: number, k: number, n: number) => {
-        for (let i = 0; i < m; i++) {
-          for (let j = 0; j < n; j++) {
-            let acc = 0;
-            for (let kk = 0; kk < k; kk++) acc += a[i * k + kk] * b[kk * n + j];
-            c[i * n + j] = acc;
-          }
-        }
-        return c[0];
-      },
-      defaultArgs: [A, B, C, M, K, N],
-    };
-  }
-
-  // XOR example (examples/xor.c)
-  if (fnName === 'xor_u8') {
-  const n = 4 * 1024 * 1024; // 4MB (keep CI stable)
-    const a = new Uint8Array(n);
-    const b = new Uint8Array(n);
-    const out = new Uint8Array(n);
-    for (let i = 0; i < n; i++) {
-      a[i] = i & 0xff;
-      b[i] = (i * 31) & 0xff;
-    }
-    return {
-      name: 'traditional-js',
-      fn: (aa: Uint8Array, bb: Uint8Array, oo: Uint8Array, nn: number) => {
-        for (let i = 0; i < nn; i++) oo[i] = aa[i] ^ bb[i];
-        return oo[0];
-      },
-      defaultArgs: [a, b, out, n],
-    };
-  }
-
-  // CRC32 example (examples/crc32.c)
-  if (fnName === 'crc32_u8') {
-  const n = 4 * 1024 * 1024; // 4MB (keep CI stable)
-    const data = new Uint8Array(n);
-    for (let i = 0; i < n; i++) data[i] = (i * 131) & 0xff;
-
-    // Tiny JS crc32 (bitwise) baseline to match the C implementation.
-    const crc32Update = (crc: number, byte: number) => {
-      crc ^= byte;
-      for (let k = 0; k < 8; k++) {
-        const mask = -(crc & 1);
-        crc = (crc >>> 1) ^ (0xedb88320 & mask);
-      }
-      return crc >>> 0;
-    };
-
-    return {
-      name: 'traditional-js',
-      fn: (buf: Uint8Array, nn: number) => {
-        let crc = 0xffffffff;
-        for (let i = 0; i < nn; i++) crc = crc32Update(crc, buf[i]);
-        return (~crc) >>> 0;
-      },
-      defaultArgs: [data, n],
-    };
-  }
-
-  // Histogram example (examples/histogram.c)
-  if (fnName === 'histogram_u8') {
-  // Node 25 + koffi can be unstable with very large TypedArray pointer marshalling
-  // in worker/process isolation. Keep the default smaller for stability.
-  const n = 512 * 1024; // 512KB
-    const data = new Uint8Array(n);
-    for (let i = 0; i < n; i++) data[i] = (i * 17) & 0xff;
-    const out = new Uint32Array(256);
-    return {
-      name: 'traditional-js',
-      fn: (buf: Uint8Array, nn: number, o: Uint32Array) => {
-        o.fill(0);
-        for (let i = 0; i < nn; i++) o[buf[i]]++;
-        return o[0];
-      },
-      defaultArgs: [data, n, out],
-    };
-  }
-
   return null;
 }
 
@@ -300,8 +130,6 @@ function pickArgs(
   callerArgs: any[] | undefined,
 ): any[] {
   if (Array.isArray(callerArgs)) return callerArgs;
-  const builtIn = getBuiltInBaseline(fnName);
-  if (builtIn) return builtIn.defaultArgs;
   return jsArity === 0 ? [] : [1, 2];
 }
 
@@ -337,9 +165,10 @@ function mapArgsForNative(
       nb.write(new Uint8Array(b.buffer, b.byteOffset, b.byteLength));
       keepAlive.push(na, nb);
   // dot_f64 is declared as (double*, double*, int).
-  // With typed pointers enabled (pointer<double>), koffi expects a pointer
-  // value, not a numeric address. Pass NativeBuffer so koffi can marshal.
-  return { args: [na, nb, n], keepAlive };
+  // With typed pointers enabled (pointer<double>), koffi accepts a Float64Array
+  // directly for `double*`. Passing numeric addresses or an untyped alloc handle
+  // can be rejected as the wrong pointer "kind" (e.g. char*).
+  return { args: [na.f64(0, n), nb.f64(0, n), n], keepAlive };
     }
   }
 
@@ -384,7 +213,19 @@ function mapArgsForNative(
       const nC = alloc(C.byteLength);
       nC.write(new Uint8Array(C.buffer, C.byteOffset, C.byteLength));
       keepAlive.push(nA, nB, nC);
-      return { args: [nA.address, nB.address, nC.address, M, K, N], keepAlive };
+      // matmul_f32 uses (float*, float*, float*, int, int, int).
+      // Provide Float32Array views so koffi can marshal `float*` correctly.
+      return {
+        args: [
+          nA.f32(0, M * K),
+          nB.f32(0, K * N),
+          nC.f32(0, M * N),
+          M,
+          K,
+          N,
+        ],
+        keepAlive,
+      };
     }
   }
 
@@ -609,17 +450,15 @@ export async function benchmarkCompareTraditionalVsRelaxnative(
   traditional: TraditionalBenchmarkResult;
   relaxnative: { sync: BenchmarkResult; worker: BenchmarkResult };
 }> {
-  const builtIn = getBuiltInBaseline(fnName);
   const baseline =
     opts?.baseline ??
-    builtIn?.fn ??
     (() => {
       throw new Error(
-        `No default baseline for fn=${fnName}. Provide opts.baseline to benchmark “traditional programming” for this function.`,
+        `Missing JS baseline for fn=${fnName}. Provide opts.baseline (a JS function) and opts.args (a JSON-serializable args array) to compare.`,
       );
     })();
 
-  const baselineName = opts?.baselineName ?? builtIn?.name ?? 'traditional-js';
+  const baselineName = opts?.baselineName ?? 'traditional-js';
 
   const traditional = await benchmarkJsFunction(baselineName, baseline, {
     iterations: opts?.iterations,

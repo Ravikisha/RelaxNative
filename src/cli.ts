@@ -65,6 +65,7 @@ Notes:
 	- Trust levels: local (no prompts), community (warning + confirmation), verified (silent install, requires signature)
 	- Add: pass --yes to make the command non-interactive (community installs will fail unless previously trusted)
 	- Bench: pass --traditional to include a JS baseline when available (built-in for add)
+	- Bench: --traditional requires --baseline <path> + --args "[...]" so both JS and native get the same inputs
 `);
 }
 
@@ -206,6 +207,7 @@ async function main() {
 		const iterationsRaw = getFlagValue(process.argv, '--iterations');
 		const warmupRaw = getFlagValue(process.argv, '--warmup');
 		const argsRaw = getFlagValue(process.argv, '--args');
+		const jsBaselinePath = getFlagValue(process.argv, '--baseline');
 		const json = hasFlag(process.argv, '--json');
 		const traditional = hasFlag(process.argv, '--traditional');
 		const confirm = hasFlag(process.argv, '--confirm');
@@ -229,6 +231,33 @@ async function main() {
 				args = parsed;
 			} catch {
 				console.error('Invalid JSON for --args (example: --args "[1,2]")');
+				process.exit(1);
+			}
+		}
+
+		let baseline: ((...args: any[]) => any) | undefined;
+		if (traditional) {
+			if (!jsBaselinePath) {
+				console.error('Missing --baseline <path>. Example: --baseline ./benchmarks/matmul.js');
+				process.exit(1);
+			}
+			try {
+				const mod: any = await import(jsBaselinePath);
+				baseline = mod?.default ?? mod?.baseline ?? mod?.fn;
+				if (typeof baseline !== 'function') {
+					console.error(
+						'Invalid baseline module: expected a default export (or named export baseline/fn) that is a function.',
+					);
+					process.exit(1);
+				}
+			} catch (e: any) {
+				console.error('Failed to import baseline module:', e?.message ?? String(e));
+				process.exit(1);
+			}
+			if (!Array.isArray(args)) {
+				console.error(
+					'When using --traditional you must also pass --args as a JSON array so the baseline and native get identical inputs.',
+				);
 				process.exit(1);
 			}
 		}
@@ -259,6 +288,7 @@ async function main() {
 					iterations,
 					warmup,
 					args,
+					baseline,
 				});
 				trace('bench traditional: done');
 			if (json) console.log(JSON.stringify(res, null, 2));

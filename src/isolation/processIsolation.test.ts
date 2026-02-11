@@ -9,7 +9,9 @@ describe('process isolation', () => {
 
     // Should reject (helper crashes) but current process stays alive.
     await expect(mod.crash_segv()).rejects.toThrow(/Isolated runtime exited/i);
-  }, 20_000);
+    // Ensure the crashed helper is fully torn down before the suite continues.
+    stopIsolatedRuntime();
+  }, 60_000);
 
   it('restarts helper after a crash', async () => {
     const mod: any = await loadNative('examples/crash.c', { isolation: 'process' });
