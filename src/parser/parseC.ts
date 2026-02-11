@@ -83,6 +83,35 @@ function mapCType(type: string | undefined) {
 
   // Fixed-width integer pointers.
   if (t.includes('*')) {
+    // Detect pointer-to-pointer (e.g., int**). We currently don't support allocating
+    // nested pointer graphs from JS, but we tag it distinctly so we can throw a
+    // clear error at bind-time rather than letting koffi mis-marshal.
+    if (t.includes('**')) {
+  // Floating point
+  if (/\bdouble\b/.test(t)) return 'pointer<pointer<double>>' as any;
+  if (/\bfloat\b/.test(t)) return 'pointer<pointer<float>>' as any;
+
+  // Fixed-width ints
+  if (/\buint8_t\b/.test(t)) return 'pointer<pointer<uint8_t>>' as any;
+  if (/\bint8_t\b/.test(t)) return 'pointer<pointer<int8_t>>' as any;
+  if (/\buint16_t\b/.test(t)) return 'pointer<pointer<uint16_t>>' as any;
+  if (/\bint16_t\b/.test(t)) return 'pointer<pointer<int16_t>>' as any;
+  if (/\buint32_t\b/.test(t)) return 'pointer<pointer<uint32_t>>' as any;
+  if (/\bint32_t\b/.test(t)) return 'pointer<pointer<int32_t>>' as any;
+  if (/\buint64_t\b/.test(t)) return 'pointer<pointer<uint64_t>>' as any;
+  if (/\bint64_t\b/.test(t)) return 'pointer<pointer<int64_t>>' as any;
+
+  // Plain C ints/longs
+  if (/\bunsigned\s+int\b/.test(t)) return 'pointer<pointer<uint>>' as any;
+  if (/\bint\b/.test(t)) return 'pointer<pointer<int>>' as any;
+  if (/\blong\b/.test(t)) return 'pointer<pointer<long>>' as any;
+
+  // char** patterns are usually argv/strings; we still tag it.
+  if (/\bchar\b/.test(t)) return 'pointer<pointer<char>>' as any;
+
+  return 'pointer<pointer<void>>' as any;
+    }
+
     // Floating-point pointers.
     // IMPORTANT: check these first.
     // For strings like "double* a", the substring "int" is present in "pointer"
@@ -98,6 +127,9 @@ function mapCType(type: string | undefined) {
     if (/\bint32_t\b/.test(t)) return 'pointer<int32_t>' as any;
     if (/\buint64_t\b/.test(t)) return 'pointer<uint64_t>' as any;
     if (/\bint64_t\b/.test(t)) return 'pointer<int64_t>' as any;
+
+  // Plain C ints.
+  if (/\bint\b/.test(t)) return 'pointer<int>' as any;
   }
 
   // Unsigned ints / fixed-width scalars.

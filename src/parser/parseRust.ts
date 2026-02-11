@@ -37,11 +37,31 @@ export function parseRustFunctions(tree: any): NativeFunction[] {
 
 function mapRustType(type: string | undefined) {
   if (!type) return 'void';
-  if (type.includes('i32')) return 'int';
-  if (type.includes('i64')) return 'long';
-  if (type.includes('f32')) return 'float';
-  if (type.includes('f64')) return 'double';
-  if (type.includes('*const i8')) return 'char*';
-  if (type.includes('*')) return 'pointer';
+
+  const t = type.replace(/\s+/g, ' ').trim();
+
+  // Scalars
+  if (/\bi32\b/.test(t)) return 'int';
+  if (/\bi64\b/.test(t)) return 'long';
+  if (/\bu32\b/.test(t)) return 'uint32_t' as any;
+  if (/\bu64\b/.test(t)) return 'uint64_t' as any;
+  if (/\bf32\b/.test(t)) return 'float';
+  if (/\bf64\b/.test(t)) return 'double';
+
+  // C strings
+  if (/\*const\s+i8\b/.test(t) || /\*mut\s+i8\b/.test(t)) return 'char*';
+
+  // Typed pointers commonly used in Rust FFI.
+  if (t.includes('*')) {
+    if (/\*const\s+f64\b/.test(t) || /\*mut\s+f64\b/.test(t)) return 'pointer<double>' as any;
+    if (/\*const\s+f32\b/.test(t) || /\*mut\s+f32\b/.test(t)) return 'pointer<float>' as any;
+    if (/\*const\s+i32\b/.test(t) || /\*mut\s+i32\b/.test(t)) return 'pointer<int>' as any;
+    if (/\*const\s+u32\b/.test(t) || /\*mut\s+u32\b/.test(t)) return 'pointer<uint32_t>' as any;
+    if (/\*const\s+u8\b/.test(t) || /\*mut\s+u8\b/.test(t)) return 'pointer<uint8_t>' as any;
+    if (/\*const\s+i8\b/.test(t) || /\*mut\s+i8\b/.test(t)) return 'pointer<int8_t>' as any;
+
+    return 'pointer';
+  }
+
   return 'unknown';
 }

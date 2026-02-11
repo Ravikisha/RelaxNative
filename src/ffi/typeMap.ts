@@ -19,6 +19,15 @@ export function mapType(type: string) {
       .replace(/^pointer\s*<\s*/i, '')
       .replace(/\s*>\s*$/i, '')
       .trim();
+
+    // pointer<pointer<T>> support (bindable, but higher-level marshalling is handled elsewhere).
+    if (/^pointer\s*<\s*pointer\s*<.+>\s*>\s*$/i.test(inner)) {
+      // Treat it as void** at the ABI level.
+      // We don't currently marshal nested pointer graphs from JS, but mapping it here:
+      // - avoids confusing "Unsupported native type" errors
+      // - lets bind-time checks throw a clearer, signature-aware message
+      return (koffi as any).pointer((koffi as any).pointer('void'));
+    }
     switch (inner) {
       case 'uint8_t':
 			return (koffi as any).pointer((koffi.types as any).uint8 ?? (koffi.types as any).uchar);
@@ -85,7 +94,11 @@ export function mapType(type: string) {
     case 'void':
       return koffi.types.void;
     case 'pointer':
-      return (koffi as any).pointer('void');
+  // Historically we used void* for all pointers, but that prevents koffi from
+  // accepting typed array inputs (it expects a numeric address for void*).
+  // Default to int* which allows passing Int32Array/TypedArray-like values.
+  // For best precision, prefer pointer<T> from the parser.
+  return (koffi as any).pointer(koffi.types.int);
     case 'buffer':
       return (koffi as any).pointer('void');
     default:

@@ -25,6 +25,19 @@ export function bindFunctions(
     const returns = mapType(fn.returns);
     const args = fn.args.map(mapType);
 
+    // Prevent silent mis-marshalling for pointer-to-pointer.
+    // Relaxnative doesn't currently allocate nested pointer graphs from JS.
+    if (
+      fn.args.some(
+        (t) => typeof t === 'string' && /^pointer\s*<\s*pointer\s*<.+>\s*>\s*$/i.test(t),
+      )
+    ) {
+      throw new Error(
+        `Unsupported native signature for ${fn.name}: pointer-to-pointer types (e.g. int**) are not supported yet. ` +
+          `Please write a wrapper that flattens the data (and pass a single pointer + sizes).`,
+      );
+    }
+
     // Fail fast with a clear message instead of letting koffi throw
     // "Unexpected Undefined value as type specifier".
     if (!returns) {
@@ -49,7 +62,44 @@ export function bindFunctions(
 
     // Wrap to support NativeBuffer/NativePointer args.
     exports[fn.name] = (...args: any[]) => {
-      const mapped = args.map((a) => {
+      const mapped = args.map((a, i) => {
+        const spec = fn.args[i];
+
+        // Convenience: allow passing a plain JS array for pointer<int>/pointer<uint32_t>/etc.
+        // We marshal to a TypedArray so koffi can pass it as a typed pointer.
+        if (Array.isArray(a) && typeof spec === 'string') {
+          const isPtr = /^pointer\s*<.+>$/i.test(spec);
+          if (isPtr) {
+            const inner = spec
+              .replace(/^pointer\s*<\s*/i, '')
+              .replace(/\s*>\s*$/i, '')
+              .trim();
+
+            switch (inner) {
+              case 'int':
+              case 'int32_t':
+                return Int32Array.from(a);
+              case 'uint32_t':
+                return Uint32Array.from(a);
+              case 'uint8_t':
+                return Uint8Array.from(a);
+              case 'int8_t':
+                return Int8Array.from(a);
+              case 'uint16_t':
+                return Uint16Array.from(a);
+              case 'int16_t':
+                return Int16Array.from(a);
+              case 'float':
+                return Float32Array.from(a);
+              case 'double':
+                return Float64Array.from(a);
+              default:
+                // Fall through: koffi might accept arrays for void*, but it's inconsistent.
+                break;
+            }
+          }
+        }
+
         if (NativeBuffer.isNativeBuffer(a)) return a.toKoffiPointer();
         if (NativePointer.isNativePointer(a)) return a.toKoffiPointer();
   // Also accept TypedArrays directly.
