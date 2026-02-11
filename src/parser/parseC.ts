@@ -87,29 +87,14 @@ function mapCType(type: string | undefined) {
     // nested pointer graphs from JS, but we tag it distinctly so we can throw a
     // clear error at bind-time rather than letting koffi mis-marshal.
     if (t.includes('**')) {
-  // Floating point
-  if (/\bdouble\b/.test(t)) return 'pointer<pointer<double>>' as any;
-  if (/\bfloat\b/.test(t)) return 'pointer<pointer<float>>' as any;
-
-  // Fixed-width ints
-  if (/\buint8_t\b/.test(t)) return 'pointer<pointer<uint8_t>>' as any;
-  if (/\bint8_t\b/.test(t)) return 'pointer<pointer<int8_t>>' as any;
-  if (/\buint16_t\b/.test(t)) return 'pointer<pointer<uint16_t>>' as any;
-  if (/\bint16_t\b/.test(t)) return 'pointer<pointer<int16_t>>' as any;
-  if (/\buint32_t\b/.test(t)) return 'pointer<pointer<uint32_t>>' as any;
-  if (/\bint32_t\b/.test(t)) return 'pointer<pointer<int32_t>>' as any;
-  if (/\buint64_t\b/.test(t)) return 'pointer<pointer<uint64_t>>' as any;
-  if (/\bint64_t\b/.test(t)) return 'pointer<pointer<int64_t>>' as any;
-
-  // Plain C ints/longs
-  if (/\bunsigned\s+int\b/.test(t)) return 'pointer<pointer<uint>>' as any;
-  if (/\bint\b/.test(t)) return 'pointer<pointer<int>>' as any;
-  if (/\blong\b/.test(t)) return 'pointer<pointer<long>>' as any;
-
-  // char** patterns are usually argv/strings; we still tag it.
-  if (/\bchar\b/.test(t)) return 'pointer<pointer<char>>' as any;
-
-  return 'pointer<pointer<void>>' as any;
+  // For pointer-to-pointer parameters, we intentionally erase the inner type.
+  // Reason: koffi distinguishes pointer "kinds" (char*, int*, double*, ...).
+  // Our JS-side marshalling builds a temporary void** table, and passing it to a
+  // typed int** signature can trigger runtime errors like:
+  //   "Unexpected char * value, expected int *"
+  // So we represent all T** as a generic pointer table and keep the true shape
+  // (pointer-to-pointer) semantics for marshalling.
+  return 'pointer<pointer>' as any;
     }
 
     // Floating-point pointers.

@@ -74,7 +74,8 @@ export function bindFunctions(
         // We allocate a temporary native table of pointers (void**) and pass that.
         if (
           typeof spec === 'string' &&
-          /^pointer\s*<\s*pointer\s*<.+>\s*>\s*$/i.test(spec)
+          (/^pointer\s*<\s*pointer\s*<.+>\s*>\s*$/i.test(spec) ||
+            /^pointer\s*<\s*pointer\s*>\s*$/i.test(spec))
         ) {
           if (!Array.isArray(a)) {
             return a;
@@ -134,7 +135,7 @@ export function bindFunctions(
           tmpPointerTables.push(table);
 
           // Pass the pointer to the start of the table as the External handle.
-          // This matches how koffi expects pointer arguments ("external pointer").
+          // This avoids numeric-address pointers and works across platforms.
           return table.handle;
         }
 

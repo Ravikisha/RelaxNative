@@ -20,6 +20,13 @@ export function mapType(type: string) {
       .replace(/\s*>\s*$/i, '')
       .trim();
 
+    // pointer<pointer> is our erased-type representation of T**.
+    if (/^pointer\s*<\s*pointer\s*>$/i.test(inner)) {
+      // Use char** as a non-ambiguous pointer-to-pointer carrier type.
+      // (void**) is rejected by koffi unless wrapped with koffi.as().
+      return (koffi as any).pointer((koffi as any).pointer('char'));
+    }
+
     // pointer<pointer<T>> support (bindable, but higher-level marshalling is handled elsewhere).
     if (/^pointer\s*<\s*pointer\s*<.+>\s*>\s*$/i.test(inner)) {
       // Treat it as void** at the ABI level.
