@@ -1,6 +1,7 @@
 import { fork, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
 
 export type ProcessIsolationErrorCode =
   | 'ISOLATED_PROCESS_CRASH'
@@ -56,13 +57,27 @@ const pending = new Map<
 >();
 
 function helperEntryPath() {
-  // Resolve the helper entry from the package root.
-  // This file may be bundled into dist/chunk-*.js, so relative URLs are unreliable.
+  // Resolve the helper entry from the *installed package root*.
+  // This file is bundled into dist/chunk-*.js, so relative URLs can be surprising
+  // once installed under node_modules.
   const here = dirname(fileURLToPath(import.meta.url));
-  // In dev/vitest, `here` is typically `<pkg>/src/worker`.
-  // In dist builds, `here` is typically `<pkg>/dist` because this code is bundled
-  // into `dist/chunk-*.js`.
-  // We *always* want to fork the built helper at `<pkg>/dist/worker/processEntry.js`.
+
+  // Walk up until we find the package boundary (package.json).
+  // This is more robust than assuming a fixed depth like "../..".
+  let cur = here;
+  for (let i = 0; i < 8; i++) {
+    const candidate = join(cur, 'package.json');
+    if (existsSync(candidate)) {
+      const pkgRoot = cur;
+      const distEntry = join(pkgRoot, 'dist', 'worker', 'processEntry.js');
+      return { distEntry, pkgRoot };
+    }
+    const parent = join(cur, '..');
+    if (parent === cur) break;
+    cur = parent;
+  }
+
+  // Fallback to previous behavior.
   const pkgRoot = join(here, '..', '..');
   const distEntry = join(pkgRoot, 'dist', 'worker', 'processEntry.js');
   return { distEntry, pkgRoot };

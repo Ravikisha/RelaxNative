@@ -1,5 +1,6 @@
 import { Worker } from 'worker_threads';
 import { existsSync } from 'fs';
+import { fileURLToPath } from 'node:url';
 
 import type { WorkerRequest, WorkerResponse } from './workerTypes.js';
 
@@ -17,7 +18,7 @@ function getWorker(): Worker {
   if (!worker) {
     // Prefer the built JS entry when present (normal runtime).
     // Fall back to TS import bootstrap for Vitest/dev environments.
-    if (existsSync(WORKER_ENTRY_JS_URL)) {
+  if (existsSync(fileURLToPath(WORKER_ENTRY_JS_URL))) {
       worker = new Worker(WORKER_ENTRY_JS_URL, {
         env: { ...process.env },
       });
