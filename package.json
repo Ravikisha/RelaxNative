@@ -1,6 +1,6 @@
 {
   "name": "relaxnative",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "Zero-config native C/C++/Rust execution for Node.js",
   "license": "MIT",
@@ -37,9 +37,9 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts src/cli.ts src/worker/workerEntry.ts src/worker/processEntry.ts src/esmLoader.ts src/memory/memory.selftest.ts --format esm --dts",
-  "test": "vitest --run --pool=threads --maxWorkers=1",
-  "test:inband": "vitest --run --pool=threads --maxWorkers=1",
-  "test:native": "vitest --run --pool=threads --maxWorkers=1 src/memory/memory.test.ts",
+    "test": "vitest --run --pool=threads --maxWorkers=1",
+    "test:inband": "vitest --run --pool=threads --maxWorkers=1",
+    "test:native": "vitest --run --pool=threads --maxWorkers=1 src/memory/memory.test.ts",
     "selftest:memory": "npm run build && node dist/memory/memory.selftest.js",
     "prepack": "npm run build",
     "release:beta": "npm publish --tag beta",
